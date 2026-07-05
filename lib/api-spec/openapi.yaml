@@ -1,0 +1,1362 @@
+openapi: 3.1.0
+info:
+  # Do not change the title, if the title changes, the import paths will be broken
+  title: Api
+  version: 0.1.0
+  description: MemoryMesh API — AI Meeting Memory System powered by Cognee
+servers:
+  - url: /api
+    description: Base API path
+tags:
+  - name: health
+    description: Health operations
+  - name: meetings
+    description: Meeting management
+  - name: memory
+    description: Cognee memory lifecycle operations
+  - name: graph
+    description: Memory knowledge graph
+  - name: search
+    description: Search and recall
+  - name: chat
+    description: AI chat with organizational memory
+  - name: dashboard
+    description: Dashboard aggregates and stats
+  - name: timeline
+    description: Chronological history
+  - name: decisions
+    description: Decision evolution tracking
+
+paths:
+  /healthz:
+    get:
+      operationId: healthCheck
+      tags: [health]
+      summary: Health check
+      responses:
+        "200":
+          description: Healthy
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthStatus"
+
+  # ─── MEETINGS ────────────────────────────────────────────────────────────────
+  /meetings:
+    get:
+      operationId: listMeetings
+      tags: [meetings]
+      summary: List all meetings
+      parameters:
+        - name: project_id
+          in: query
+          schema:
+            type: ["integer", "null"]
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 50
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+      responses:
+        "200":
+          description: List of meetings
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Meeting"
+    post:
+      operationId: createMeeting
+      tags: [meetings]
+      summary: Create and process a new meeting
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MeetingInput"
+      responses:
+        "201":
+          description: Meeting created and memory ingestion started
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Meeting"
+
+  /meetings/{id}:
+    get:
+      operationId: getMeeting
+      tags: [meetings]
+      summary: Get meeting details
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Meeting details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MeetingDetail"
+        "404":
+          description: Not found
+    delete:
+      operationId: deleteMeeting
+      tags: [meetings]
+      summary: Delete a meeting and forget its memories
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Deleted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OperationResult"
+
+  /meetings/{id}/process:
+    post:
+      operationId: processMeeting
+      tags: [meetings]
+      summary: Re-trigger memory extraction for a meeting
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "202":
+          description: Processing started
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProcessingStatus"
+
+  /meetings/{id}/entities:
+    get:
+      operationId: getMeetingEntities
+      tags: [meetings]
+      summary: Get all extracted entities from a meeting
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Entities
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Entity"
+
+  # ─── MEMORY LIFECYCLE ─────────────────────────────────────────────────────────
+  /memory/remember:
+    post:
+      operationId: rememberMeeting
+      tags: [memory]
+      summary: Cognee Remember — store and merge meeting into the memory graph
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RememberInput"
+      responses:
+        "200":
+          description: Memory stored
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MemoryResult"
+
+  /memory/recall:
+    post:
+      operationId: recallMemory
+      tags: [memory]
+      summary: Cognee Recall — retrieve relevant memories for a query
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RecallInput"
+      responses:
+        "200":
+          description: Recalled memories
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RecallResult"
+
+  /memory/improve:
+    post:
+      operationId: improveMemory
+      tags: [memory]
+      summary: Cognee Improve — update/evolve existing memories with new information
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ImproveInput"
+      responses:
+        "200":
+          description: Memory improved
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MemoryResult"
+
+  /memory/forget:
+    post:
+      operationId: forgetMemory
+      tags: [memory]
+      summary: Cognee Forget — remove memories from the graph
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ForgetInput"
+      responses:
+        "200":
+          description: Memories forgotten
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OperationResult"
+
+  /memory/stats:
+    get:
+      operationId: getMemoryStats
+      tags: [memory]
+      summary: Get overall memory statistics
+      responses:
+        "200":
+          description: Memory statistics
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MemoryStats"
+
+  # ─── KNOWLEDGE GRAPH ──────────────────────────────────────────────────────────
+  /graph:
+    get:
+      operationId: getGraph
+      tags: [graph]
+      summary: Get the full knowledge graph for visualization
+      parameters:
+        - name: project_id
+          in: query
+          schema:
+            type: ["integer", "null"]
+        - name: entity_type
+          in: query
+          schema:
+            type: ["string", "null"]
+        - name: depth
+          in: query
+          schema:
+            type: integer
+            default: 3
+      responses:
+        "200":
+          description: Graph data
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GraphData"
+
+  /graph/node/{nodeId}:
+    get:
+      operationId: getGraphNode
+      tags: [graph]
+      summary: Get node details with its connections
+      parameters:
+        - name: nodeId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Node details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GraphNode"
+
+  # ─── SEARCH ───────────────────────────────────────────────────────────────────
+  /search:
+    post:
+      operationId: searchMemory
+      tags: [search]
+      summary: Semantic + graph hybrid search
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SearchInput"
+      responses:
+        "200":
+          description: Search results
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SearchResult"
+
+  /search/suggestions:
+    get:
+      operationId: getSearchSuggestions
+      tags: [search]
+      summary: Get real-time topic suggestions for a meeting
+      parameters:
+        - name: topic
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Suggestions
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/TopicSuggestion"
+
+  # ─── AI CHAT ──────────────────────────────────────────────────────────────────
+  /chat:
+    post:
+      operationId: chatWithMemory
+      tags: [chat]
+      summary: Chat with organizational memory
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ChatInput"
+      responses:
+        "200":
+          description: Chat response with sources
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChatResponse"
+
+  /chat/history:
+    get:
+      operationId: getChatHistory
+      tags: [chat]
+      summary: Get recent chat history
+      responses:
+        "200":
+          description: Chat history
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ChatMessage"
+
+  # ─── DASHBOARD ────────────────────────────────────────────────────────────────
+  /dashboard:
+    get:
+      operationId: getDashboard
+      tags: [dashboard]
+      summary: Get dashboard summary data
+      responses:
+        "200":
+          description: Dashboard data
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DashboardData"
+
+  /dashboard/topics:
+    get:
+      operationId: getTopTopics
+      tags: [dashboard]
+      summary: Get top discussed topics
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 10
+      responses:
+        "200":
+          description: Top topics
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/TopicFrequency"
+
+  /dashboard/activity:
+    get:
+      operationId: getRecentActivity
+      tags: [dashboard]
+      summary: Get recent activity feed
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+      responses:
+        "200":
+          description: Activity feed
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ActivityItem"
+
+  # ─── TIMELINE ─────────────────────────────────────────────────────────────────
+  /timeline:
+    get:
+      operationId: getTimeline
+      tags: [timeline]
+      summary: Get chronological timeline of meetings, decisions, and tasks
+      parameters:
+        - name: project_id
+          in: query
+          schema:
+            type: ["integer", "null"]
+        - name: entity_type
+          in: query
+          schema:
+            type: ["string", "null"]
+      responses:
+        "200":
+          description: Timeline events
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/TimelineEvent"
+
+  # ─── DECISIONS ────────────────────────────────────────────────────────────────
+  /decisions:
+    get:
+      operationId: listDecisions
+      tags: [decisions]
+      summary: List all tracked decisions
+      parameters:
+        - name: project_id
+          in: query
+          schema:
+            type: ["integer", "null"]
+        - name: status
+          in: query
+          schema:
+            type: ["string", "null"]
+      responses:
+        "200":
+          description: Decisions
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Decision"
+
+  /decisions/{id}/evolution:
+    get:
+      operationId: getDecisionEvolution
+      tags: [decisions]
+      summary: Get the full evolution timeline of a decision
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Decision evolution with full history
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DecisionEvolution"
+
+  # ─── ENTITIES ─────────────────────────────────────────────────────────────────
+  /entities:
+    get:
+      operationId: listEntities
+      tags: [meetings]
+      summary: List all entities across all meetings
+      parameters:
+        - name: type
+          in: query
+          schema:
+            type: ["string", "null"]
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 50
+      responses:
+        "200":
+          description: Entities
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Entity"
+
+  /entities/{id}/forget:
+    delete:
+      operationId: forgetEntity
+      tags: [memory]
+      summary: Forget a specific entity (person, project, etc.)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Entity forgotten
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OperationResult"
+
+  /projects:
+    get:
+      operationId: listProjects
+      tags: [meetings]
+      summary: List all projects extracted from meetings
+      responses:
+        "200":
+          description: Projects
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Project"
+
+  /projects/{id}/forget:
+    delete:
+      operationId: forgetProject
+      tags: [memory]
+      summary: Forget all memories related to a project
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Project forgotten
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OperationResult"
+
+components:
+  schemas:
+    HealthStatus:
+      type: object
+      required: [status]
+      properties:
+        status:
+          type: string
+
+    # ─── MEETINGS ──────────────────────────────────────────────────────────────
+    Meeting:
+      type: object
+      required: [id, title, date, status, participant_count, entity_count]
+      properties:
+        id:
+          type: integer
+        title:
+          type: string
+        date:
+          type: string
+          format: date-time
+        status:
+          type: string
+          enum: [pending, processing, indexed, failed]
+        participant_count:
+          type: integer
+        entity_count:
+          type: integer
+        project_names:
+          type: array
+          items:
+            type: string
+        summary:
+          type: ["string", "null"]
+        duration_minutes:
+          type: ["integer", "null"]
+        tags:
+          type: array
+          items:
+            type: string
+        created_at:
+          type: string
+          format: date-time
+
+    MeetingDetail:
+      type: object
+      required: [id, title, date, status, transcript, entities, decisions, tasks, participants]
+      properties:
+        id:
+          type: integer
+        title:
+          type: string
+        date:
+          type: string
+          format: date-time
+        status:
+          type: string
+        transcript:
+          type: string
+        summary:
+          type: ["string", "null"]
+        entities:
+          type: array
+          items:
+            $ref: "#/components/schemas/Entity"
+        decisions:
+          type: array
+          items:
+            $ref: "#/components/schemas/Decision"
+        tasks:
+          type: array
+          items:
+            $ref: "#/components/schemas/Task"
+        participants:
+          type: array
+          items:
+            $ref: "#/components/schemas/Participant"
+        risks:
+          type: array
+          items:
+            type: string
+        blockers:
+          type: array
+          items:
+            type: string
+        topics:
+          type: array
+          items:
+            type: string
+        related_meetings:
+          type: array
+          items:
+            $ref: "#/components/schemas/Meeting"
+        duration_minutes:
+          type: ["integer", "null"]
+
+    MeetingInput:
+      type: object
+      required: [title, date, content]
+      properties:
+        title:
+          type: string
+          minLength: 1
+        date:
+          type: string
+          format: date-time
+        content:
+          type: string
+          minLength: 1
+          description: Meeting transcript or notes text
+        content_type:
+          type: string
+          enum: [transcript, notes, summary]
+          default: transcript
+        project_id:
+          type: ["integer", "null"]
+        duration_minutes:
+          type: ["integer", "null"]
+        tags:
+          type: array
+          items:
+            type: string
+
+    ProcessingStatus:
+      type: object
+      required: [meeting_id, status, message]
+      properties:
+        meeting_id:
+          type: integer
+        status:
+          type: string
+        message:
+          type: string
+        progress:
+          type: ["integer", "null"]
+
+    # ─── ENTITIES ──────────────────────────────────────────────────────────────
+    Entity:
+      type: object
+      required: [id, name, type, meeting_count]
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        type:
+          type: string
+          enum: [person, project, topic, decision, task, risk, blocker, document, question, deadline]
+        description:
+          type: ["string", "null"]
+        meeting_count:
+          type: integer
+        first_seen:
+          type: ["string", "null"]
+          format: date-time
+        last_seen:
+          type: ["string", "null"]
+          format: date-time
+        attributes:
+          type: object
+          additionalProperties: true
+
+    Participant:
+      type: object
+      required: [id, name]
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        role:
+          type: ["string", "null"]
+        email:
+          type: ["string", "null"]
+        meeting_count:
+          type: integer
+
+    Project:
+      type: object
+      required: [id, name, meeting_count, status]
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        description:
+          type: ["string", "null"]
+        meeting_count:
+          type: integer
+        status:
+          type: string
+          enum: [active, completed, on_hold, archived]
+        participant_count:
+          type: integer
+        decision_count:
+          type: integer
+        open_task_count:
+          type: integer
+
+    Decision:
+      type: object
+      required: [id, title, status, meeting_id, created_at]
+      properties:
+        id:
+          type: integer
+        title:
+          type: string
+        description:
+          type: ["string", "null"]
+        status:
+          type: string
+          enum: [active, revised, superseded, implemented, rejected]
+        meeting_id:
+          type: integer
+        meeting_title:
+          type: ["string", "null"]
+        project_name:
+          type: ["string", "null"]
+        assigned_to:
+          type: ["string", "null"]
+        created_at:
+          type: string
+          format: date-time
+        revision_count:
+          type: integer
+
+    Task:
+      type: object
+      required: [id, title, status, created_at]
+      properties:
+        id:
+          type: integer
+        title:
+          type: string
+        description:
+          type: ["string", "null"]
+        status:
+          type: string
+          enum: [open, in_progress, completed, blocked, overdue]
+        assigned_to:
+          type: ["string", "null"]
+        due_date:
+          type: ["string", "null"]
+          format: date-time
+        project_name:
+          type: ["string", "null"]
+        meeting_id:
+          type: integer
+        created_at:
+          type: string
+          format: date-time
+
+    # ─── MEMORY ────────────────────────────────────────────────────────────────
+    RememberInput:
+      type: object
+      required: [meeting_id]
+      properties:
+        meeting_id:
+          type: integer
+        force_reindex:
+          type: boolean
+          default: false
+
+    RecallInput:
+      type: object
+      required: [query]
+      properties:
+        query:
+          type: string
+          minLength: 1
+        context_limit:
+          type: integer
+          default: 10
+        meeting_ids:
+          type: array
+          items:
+            type: integer
+
+    ImproveInput:
+      type: object
+      required: [meeting_id, target_entity_id]
+      properties:
+        meeting_id:
+          type: integer
+        target_entity_id:
+          type: integer
+        relationship_type:
+          type: string
+          enum: [updates, supersedes, confirms, contradicts, refines]
+
+    ForgetInput:
+      type: object
+      required: [scope]
+      properties:
+        scope:
+          type: string
+          enum: [meeting, project, entity, workspace]
+        target_id:
+          type: ["integer", "null"]
+        reason:
+          type: ["string", "null"]
+
+    MemoryResult:
+      type: object
+      required: [success, entities_processed, relationships_created]
+      properties:
+        success:
+          type: boolean
+        entities_processed:
+          type: integer
+        relationships_created:
+          type: integer
+        merged_entities:
+          type: integer
+        message:
+          type: string
+
+    RecallResult:
+      type: object
+      required: [query, results, sources]
+      properties:
+        query:
+          type: string
+        results:
+          type: array
+          items:
+            $ref: "#/components/schemas/RecallItem"
+        sources:
+          type: array
+          items:
+            $ref: "#/components/schemas/MemorySource"
+        total:
+          type: integer
+
+    RecallItem:
+      type: object
+      required: [content, relevance_score, entity_type]
+      properties:
+        content:
+          type: string
+        relevance_score:
+          type: number
+        entity_type:
+          type: string
+        entity_name:
+          type: string
+        meeting_id:
+          type: ["integer", "null"]
+        meeting_title:
+          type: ["string", "null"]
+        date:
+          type: ["string", "null"]
+          format: date-time
+
+    MemorySource:
+      type: object
+      required: [meeting_id, meeting_title, date, entity_type]
+      properties:
+        meeting_id:
+          type: integer
+        meeting_title:
+          type: string
+        date:
+          type: string
+          format: date-time
+        entity_type:
+          type: string
+        entity_name:
+          type: string
+
+    MemoryStats:
+      type: object
+      required: [total_meetings, total_entities, total_relationships, total_decisions, total_tasks]
+      properties:
+        total_meetings:
+          type: integer
+        total_entities:
+          type: integer
+        total_relationships:
+          type: integer
+        total_decisions:
+          type: integer
+        total_tasks:
+          type: integer
+        entity_breakdown:
+          type: object
+          additionalProperties:
+            type: integer
+        memory_size_mb:
+          type: number
+        last_updated:
+          type: ["string", "null"]
+          format: date-time
+
+    OperationResult:
+      type: object
+      required: [success, message]
+      properties:
+        success:
+          type: boolean
+        message:
+          type: string
+        affected_count:
+          type: integer
+
+    # ─── GRAPH ─────────────────────────────────────────────────────────────────
+    GraphData:
+      type: object
+      required: [nodes, edges]
+      properties:
+        nodes:
+          type: array
+          items:
+            $ref: "#/components/schemas/GraphNodeSummary"
+        edges:
+          type: array
+          items:
+            $ref: "#/components/schemas/GraphEdge"
+        node_count:
+          type: integer
+        edge_count:
+          type: integer
+
+    GraphNodeSummary:
+      type: object
+      required: [id, label, type, weight]
+      properties:
+        id:
+          type: string
+        label:
+          type: string
+        type:
+          type: string
+        weight:
+          type: number
+        entity_id:
+          type: ["integer", "null"]
+        color:
+          type: ["string", "null"]
+        description:
+          type: ["string", "null"]
+
+    GraphNode:
+      type: object
+      required: [id, label, type, connections]
+      properties:
+        id:
+          type: string
+        label:
+          type: string
+        type:
+          type: string
+        entity_id:
+          type: ["integer", "null"]
+        description:
+          type: ["string", "null"]
+        connections:
+          type: array
+          items:
+            $ref: "#/components/schemas/GraphEdge"
+        meetings:
+          type: array
+          items:
+            $ref: "#/components/schemas/Meeting"
+        attributes:
+          type: object
+          additionalProperties: true
+
+    GraphEdge:
+      type: object
+      required: [source, target, relationship]
+      properties:
+        source:
+          type: string
+        target:
+          type: string
+        relationship:
+          type: string
+        weight:
+          type: number
+        meeting_id:
+          type: ["integer", "null"]
+
+    # ─── SEARCH ────────────────────────────────────────────────────────────────
+    SearchInput:
+      type: object
+      required: [query]
+      properties:
+        query:
+          type: string
+          minLength: 1
+        mode:
+          type: string
+          enum: [semantic, graph, hybrid]
+          default: hybrid
+        entity_types:
+          type: array
+          items:
+            type: string
+        limit:
+          type: integer
+          default: 10
+
+    SearchResult:
+      type: object
+      required: [query, results, total]
+      properties:
+        query:
+          type: string
+        results:
+          type: array
+          items:
+            $ref: "#/components/schemas/SearchHit"
+        total:
+          type: integer
+        search_mode:
+          type: string
+
+    SearchHit:
+      type: object
+      required: [id, title, type, score, excerpt]
+      properties:
+        id:
+          type: integer
+        title:
+          type: string
+        type:
+          type: string
+        score:
+          type: number
+        excerpt:
+          type: string
+        meeting_id:
+          type: ["integer", "null"]
+        meeting_title:
+          type: ["string", "null"]
+        date:
+          type: ["string", "null"]
+          format: date-time
+        entity_type:
+          type: ["string", "null"]
+
+    TopicSuggestion:
+      type: object
+      required: [topic, related_meetings, last_discussed]
+      properties:
+        topic:
+          type: string
+        related_meetings:
+          type: array
+          items:
+            type: string
+        last_discussed:
+          type: string
+          format: date-time
+        conflict_warning:
+          type: ["string", "null"]
+        meeting_count:
+          type: integer
+
+    # ─── CHAT ──────────────────────────────────────────────────────────────────
+    ChatInput:
+      type: object
+      required: [message]
+      properties:
+        message:
+          type: string
+          minLength: 1
+        conversation_id:
+          type: ["string", "null"]
+        context_limit:
+          type: integer
+          default: 5
+
+    ChatResponse:
+      type: object
+      required: [answer, sources, conversation_id]
+      properties:
+        answer:
+          type: string
+        conversation_id:
+          type: string
+        sources:
+          type: array
+          items:
+            $ref: "#/components/schemas/MemorySource"
+        decisions_referenced:
+          type: array
+          items:
+            $ref: "#/components/schemas/Decision"
+        people_referenced:
+          type: array
+          items:
+            $ref: "#/components/schemas/Participant"
+        meetings_referenced:
+          type: array
+          items:
+            $ref: "#/components/schemas/Meeting"
+        confidence:
+          type: number
+
+    ChatMessage:
+      type: object
+      required: [id, role, content, created_at]
+      properties:
+        id:
+          type: string
+        role:
+          type: string
+          enum: [user, assistant]
+        content:
+          type: string
+        sources:
+          type: array
+          items:
+            $ref: "#/components/schemas/MemorySource"
+        conversation_id:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+
+    # ─── DASHBOARD ─────────────────────────────────────────────────────────────
+    DashboardData:
+      type: object
+      required: [recent_meetings, pending_tasks, recent_decisions, active_projects, memory_stats]
+      properties:
+        recent_meetings:
+          type: array
+          items:
+            $ref: "#/components/schemas/Meeting"
+        pending_tasks:
+          type: array
+          items:
+            $ref: "#/components/schemas/Task"
+        recent_decisions:
+          type: array
+          items:
+            $ref: "#/components/schemas/Decision"
+        active_projects:
+          type: array
+          items:
+            $ref: "#/components/schemas/Project"
+        memory_stats:
+          $ref: "#/components/schemas/MemoryStats"
+        unresolved_blockers:
+          type: array
+          items:
+            type: string
+        overdue_tasks:
+          type: array
+          items:
+            $ref: "#/components/schemas/Task"
+
+    TopicFrequency:
+      type: object
+      required: [topic, count, last_mentioned]
+      properties:
+        topic:
+          type: string
+        count:
+          type: integer
+        last_mentioned:
+          type: string
+          format: date-time
+        trend:
+          type: string
+          enum: [rising, stable, declining]
+
+    ActivityItem:
+      type: object
+      required: [id, type, title, timestamp]
+      properties:
+        id:
+          type: string
+        type:
+          type: string
+          enum: [meeting_added, decision_made, task_created, decision_updated, entity_merged, memory_improved]
+        title:
+          type: string
+        description:
+          type: ["string", "null"]
+        timestamp:
+          type: string
+          format: date-time
+        entity_id:
+          type: ["integer", "null"]
+        meeting_id:
+          type: ["integer", "null"]
+
+    # ─── TIMELINE ──────────────────────────────────────────────────────────────
+    TimelineEvent:
+      type: object
+      required: [id, type, title, date]
+      properties:
+        id:
+          type: string
+        type:
+          type: string
+          enum: [meeting, decision, task, decision_update, entity_merge]
+        title:
+          type: string
+        description:
+          type: ["string", "null"]
+        date:
+          type: string
+          format: date-time
+        meeting_id:
+          type: ["integer", "null"]
+        meeting_title:
+          type: ["string", "null"]
+        entity_id:
+          type: ["integer", "null"]
+        status:
+          type: ["string", "null"]
+        project_name:
+          type: ["string", "null"]
+        is_milestone:
+          type: boolean
+
+    # ─── DECISIONS ─────────────────────────────────────────────────────────────
+    DecisionEvolution:
+      type: object
+      required: [decision_id, title, current_status, history, timeline]
+      properties:
+        decision_id:
+          type: integer
+        title:
+          type: string
+        current_status:
+          type: string
+        current_description:
+          type: ["string", "null"]
+        project_name:
+          type: ["string", "null"]
+        history:
+          type: array
+          items:
+            $ref: "#/components/schemas/DecisionHistoryEntry"
+        timeline:
+          type: array
+          items:
+            $ref: "#/components/schemas/TimelineEvent"
+        pros:
+          type: array
+          items:
+            type: string
+        cons:
+          type: array
+          items:
+            type: string
+        reasons:
+          type: array
+          items:
+            type: string
+
+    DecisionHistoryEntry:
+      type: object
+      required: [meeting_id, meeting_title, date, action, description]
+      properties:
+        meeting_id:
+          type: integer
+        meeting_title:
+          type: string
+        date:
+          type: string
+          format: date-time
+        action:
+          type: string
+          enum: [created, updated, superseded, confirmed, rejected]
+        description:
+          type: string
+        previous_value:
+          type: ["string", "null"]
+        new_value:
+          type: ["string", "null"]

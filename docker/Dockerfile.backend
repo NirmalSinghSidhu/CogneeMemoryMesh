@@ -1,0 +1,31 @@
+FROM python:3.11-slim
+
+WORKDIR /app
+
+# System dependencies
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    curl \
+    git \
+    libpq-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Python dependencies
+COPY backend/requirements.txt ./requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copy backend source
+COPY backend/ ./backend/
+
+# Create data directories (Cognee stores vectors under data/cognee/)
+RUN mkdir -p \
+    /app/data/cognee/cognee.lancedb \
+    /app/data/cognee/files \
+    /app/data/cognee/system \
+    /app/data/uploads \
+    /app/data/graph \
+    /app/logs
+
+EXPOSE 8000
+
+CMD ["uvicorn", "backend.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "2"]

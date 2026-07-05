@@ -1,0 +1,121 @@
+version: "3.9"
+
+# MemoryMesh — Docker with Ollama (no API keys required)
+# Run: docker compose up --build
+# For OpenAI/Gemini/Groq instead, use docker-compose.cloud.yml (see README).
+
+services:
+  # ─── PostgreSQL ─────────────────────────────────────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    container_name: memorymesh-postgres
+    environment:
+      POSTGRES_DB: memorymesh
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d memorymesh"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - memorymesh
+
+  # ─── Ollama (Local LLM) ─────────────────────────────────────────────────────
+  ollama:
+    image: ollama/ollama:latest
+    container_name: memorymesh-ollama
+    volumes:
+      - ollama_data:/root/.ollama
+    ports:
+      - "11434:11434"
+    healthcheck:
+      test: ["CMD", "ollama", "list"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 30s
+    networks:
+      - memorymesh
+
+  # ─── Ollama Model Initializer ────────────────────────────────────────────────
+  ollama-init:
+    image: ollama/ollama:latest
+    container_name: memorymesh-ollama-init
+    depends_on:
+      ollama:
+        condition: service_healthy
+    volumes:
+      - ollama_data:/root/.ollama
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        OLLAMA_HOST=http://ollama:11434 ollama pull qwen2.5
+        OLLAMA_HOST=http://ollama:11434 ollama pull nomic-embed-text
+        echo "Models pulled successfully"
+    networks:
+      - memorymesh
+
+  # ─── FastAPI Backend ─────────────────────────────────────────────────────────
+  backend:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.backend
+    container_name: memorymesh-backend
+    environment:
+      DATABASE_URL: postgresql+asyncpg://postgres:postgres@postgres:5432/memorymesh
+      DATABASE_URL_SYNC: postgresql://postgres:postgres@postgres:5432/memorymesh
+      LLM_PROVIDER: ollama
+      LLM_MODEL: qwen2.5
+      LLM_BASE_URL: http://ollama:11434
+      EMBEDDING_PROVIDER: ollama
+      EMBEDDING_MODEL: nomic-embed-text
+      VECTOR_DB_PROVIDER: lancedb
+      VECTOR_DB_PATH: /app/data/cognee/cognee.lancedb
+      UPLOAD_DIR: /app/data/uploads
+      JWT_SECRET: ${JWT_SECRET:-change-me-in-production-use-a-long-random-string}
+      DEBUG: "false"
+    volumes:
+      - backend_data:/app/data
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      ollama-init:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8000/api/healthz || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 15
+      start_period: 120s
+    networks:
+      - memorymesh
+
+  # ─── React Frontend ──────────────────────────────────────────────────────────
+  frontend:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.frontend
+    container_name: memorymesh-frontend
+    ports:
+      - "3000:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - memorymesh
+
+volumes:
+  postgres_data:
+  ollama_data:
+  backend_data:
+
+networks:
+  memorymesh:
+    driver: bridge

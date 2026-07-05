@@ -1,0 +1,77 @@
+# MemoryMesh — Docker without Ollama (cloud API keys)
+#
+# Setup:
+#   cp .env.example .env
+#   # Edit .env and set OPENAI_API_KEY (or Gemini/Groq keys)
+#   docker compose -f docker-compose.cloud.yml up --build
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: memorymesh-postgres
+    environment:
+      POSTGRES_DB: memorymesh
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d memorymesh"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - memorymesh
+
+  backend:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.backend
+    container_name: memorymesh-backend
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql+asyncpg://postgres:postgres@postgres:5432/memorymesh
+      VECTOR_DB_PROVIDER: lancedb
+      VECTOR_DB_PATH: /app/data/cognee/cognee.lancedb
+      UPLOAD_DIR: /app/data/uploads
+      JWT_SECRET: ${JWT_SECRET:-change-me-in-production-use-a-long-random-string}
+      DEBUG: "false"
+    volumes:
+      - backend_data:/app/data
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8000/api/healthz || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 15
+      start_period: 90s
+    networks:
+      - memorymesh
+
+  frontend:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.frontend
+    container_name: memorymesh-frontend
+    ports:
+      - "3000:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - memorymesh
+
+volumes:
+  postgres_data:
+  backend_data:
+
+networks:
+  memorymesh:
+    driver: bridge

@@ -1,0 +1,19 @@
+{
+  "name": "workspace",
+  "version": "0.0.0",
+  "license": "MIT",
+  "scripts": {
+    "preinstall": "node scripts/preinstall.cjs",
+    "build": "pnpm run typecheck && pnpm -r --if-present run build",
+    "typecheck:libs": "tsc --build",
+    "typecheck": "pnpm run typecheck:libs && pnpm -r --filter \"./frontend\" --filter \"./scripts\" --if-present run typecheck",
+    "backend:dev": "python -m uvicorn backend.main:app --host 0.0.0.0 --port 8000 --reload",
+    "backend:install": "pip install -r backend/requirements-local.txt",
+    "seed": "python -m backend.scripts.seed"
+  },
+  "private": true,
+  "devDependencies": {
+    "prettier": "^3.8.4",
+    "typescript": "~5.9.3"
+  }
+}
